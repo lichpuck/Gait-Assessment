@@ -1,0 +1,50 @@
+# Python environment and caches
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor and OS files
+.vscode/
+.DS_Store
+
+# Repository-local data and generated outputs
+raw_data/
+outputs/
+
+# Large model assets
+body_models/smpl/*.pkl
+
+# Common binary/data artifacts
+*.pkl
+*.npz
+*.npy
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.onnx
+*.joblib
+*.zip
+*.tar
+*.gz
+*.7z
+
+# Images and videos generated during processing
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.bmp
+*.tif
+*.tiff
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Notebook checkpoints
+.ipynb_checkpoints/
