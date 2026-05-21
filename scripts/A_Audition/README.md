@@ -8,6 +8,8 @@
 
 It does not fit a floor, correct slope, level the ground, recenter trajectories, or canonicalize SMPL pose.
 
+The raw I/O and SMPL forward layers are implemented locally for A_Audition; this module does not import or require the removed `care_pd_pipeline` package.
+
 ## Outputs
 
 Each valid sequence writes three files under `outputs/A_Audition/<subset>/`.
@@ -58,6 +60,28 @@ All subsets:
 conda run -n hymotion python scripts/A_Audition/run_all_subsets.py \
   --max-trials-per-subset 3
 ```
+
+## Inputs and SMPL Forward
+
+Raw subset files are read from `raw_data/*.pkl` as nested datasets:
+
+```text
+{
+  subject_id: {
+    trial_id: {
+      "pose": (T, 72),
+      "trans": (T, 3),
+      "beta": (1, 10) | (10,) | constant (T, 10),
+      "fps": scalar,
+      ...metadata
+    }
+  }
+}
+```
+
+The loader first attempts `joblib.load`, which supports the current compressed raw CARE-PD files, then falls back to standard `pickle.load` for plain pickle inputs. `beta` is normalized to `(1, 10)`; per-frame `(T, 10)` beta is accepted only when every row is constant within floating-point tolerance.
+
+SMPL forward kinematics are run locally through `smplx` and `body_models/smpl/SMPL_NEUTRAL.pkl`. Because the official SMPL `.pkl` files can contain legacy chumpy objects, the local wrapper patches the small set of NumPy 2.x aliases needed during model loading before calling `smplx`.
 
 ## Axis Inference
 

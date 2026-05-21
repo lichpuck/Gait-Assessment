@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one external SMPL pickle through A->F and emit one final JSON."""
+"""Run one external SMPL pickle through A->G and emit one final JSON."""
 
 from __future__ import annotations
 
@@ -33,6 +33,8 @@ from scripts.E_Extraction.pipeline import extract_sequence  # noqa: E402
 from scripts.F_Description.descriptor_rules import build_reference  # noqa: E402
 from scripts.F_Description.io_utils import load_sequence_json, load_subset_reference_tables  # noqa: E402
 from scripts.F_Description.pipeline import describe_one_sequence  # noqa: E402
+from scripts.G_Animation.config import AnimationConfig  # noqa: E402
+from scripts.G_Animation.pipeline import process_one_sequence as render_animation_sequence  # noqa: E402
 from scripts.single_sequence_input import NormalizedInput, normalize_input_pkl  # noqa: E402
 
 
@@ -65,7 +67,7 @@ def _jsonable(value: Any) -> Any:
     return str(value)
 
 
-def _stage_status(a_result, b_result, c_result, d_result, e_result, f_result) -> dict[str, object]:
+def _stage_status(a_result, b_result, c_result, d_result, e_result, f_result, g_result) -> dict[str, object]:
     return {
         "A_Audition": {
             "status": "success",
@@ -98,6 +100,11 @@ def _stage_status(a_result, b_result, c_result, d_result, e_result, f_result) ->
             "status": "success",
             "warnings": list(f_result.warnings),
         },
+        "G_Animation": {
+            "status": "success",
+            "render": g_result.render_summary,
+            "outputs": {name: str(path) for name, path in g_result.output_paths.items()},
+        },
     }
 
 
@@ -111,6 +118,7 @@ def _final_payload(
     d_result,
     e_result,
     f_result,
+    g_result,
 ) -> dict[str, object]:
     sequence = normalized.sequence
     return {
@@ -136,7 +144,7 @@ def _final_payload(
         },
         "quality_summary": {
             "warnings": list(dict.fromkeys([*a_result.warnings, *b_result.warnings, *c_result.warnings, *d_result.warnings, *e_result.warnings, *f_result.warnings])),
-            "stage_status": _stage_status(a_result, b_result, c_result, d_result, e_result, f_result),
+            "stage_status": _stage_status(a_result, b_result, c_result, d_result, e_result, f_result, g_result),
         },
         "physical_features": {
             "walk_segments": e_result.walk_rows,
@@ -147,8 +155,14 @@ def _final_payload(
             "language": f_result.config.language,
             "profile": f_result.profile,
         },
+        "animation": {
+            "render": g_result.render_summary,
+            "outputs": {name: str(path) for name, path in g_result.output_paths.items()},
+        },
         "outputs": {
             "json": str(final_output_path),
+            "animation_mp4": str(g_result.output_paths.get("mp4", "")),
+            "animation_manifest": str(g_result.output_paths.get("json", "")),
         },
     }
 
@@ -230,6 +244,19 @@ def run_one_sequence(input_pkl: str | Path) -> Path:
             reference_subset_name=DEFAULT_REFERENCE_SUBSET,
         )
 
+        g_config = AnimationConfig(
+            input_b_dir=stage_b_dir,
+            input_c_dir=stage_c_dir,
+            input_d_dir=stage_d_dir,
+            input_f_dir=stage_f_dir,
+        )
+        g_result = render_animation_sequence(
+            sequence.subset_name,
+            sequence.subject_id,
+            sequence.trial_id,
+            config=g_config,
+        )
+
         payload = _final_payload(
             normalized,
             final_output_path,
@@ -240,6 +267,7 @@ def run_one_sequence(input_pkl: str | Path) -> Path:
             d_result,
             e_result,
             f_result,
+            g_result,
         )
         with final_output_path.open("w", encoding="utf-8") as handle:
             json.dump(_jsonable(payload), handle, indent=2, ensure_ascii=False, allow_nan=False)
@@ -248,7 +276,7 @@ def run_one_sequence(input_pkl: str | Path) -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run one SMPL pickle through A->F and emit one final JSON.")
+    parser = argparse.ArgumentParser(description="Run one SMPL pickle through A->G and emit one final JSON.")
     parser.add_argument("--input-pkl", required=True, help="Path to a single-sequence or single-record dataset pickle.")
     return parser.parse_args()
 

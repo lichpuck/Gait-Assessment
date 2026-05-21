@@ -10,7 +10,7 @@ from typing import Any
 
 import numpy as np
 
-from care_pd_pipeline.C_Sequence_Animation.io_utils import AnimationSequence, validate_sequence
+from scripts.A_Audition.io_utils import SequenceRecord, validate_sequence
 
 
 DEFAULT_SUBSET_NAME = "single_sequence"
@@ -24,7 +24,7 @@ def _safe_name(text: str) -> str:
 
 @dataclass(frozen=True)
 class NormalizedInput:
-    sequence: AnimationSequence
+    sequence: SequenceRecord
     input_path: Path
     input_kind: str
     schema_version: str
@@ -32,8 +32,22 @@ class NormalizedInput:
 
 def _load_pickle(path: str | Path) -> Any:
     file_path = Path(path)
-    with file_path.open("rb") as handle:
-        return pickle.load(handle)
+    try:
+        import joblib
+
+        return joblib.load(file_path)
+    except Exception as joblib_error:
+        with file_path.open("rb") as handle:
+            try:
+                return pickle.load(handle)
+            except UnicodeDecodeError:
+                handle.seek(0)
+                return pickle.load(handle, encoding="latin1")
+            except Exception as pickle_error:
+                raise ValueError(
+                    f"Could not load {file_path} with joblib or pickle: "
+                    f"joblib={joblib_error}; pickle={pickle_error}"
+                ) from pickle_error
 
 
 def _extract_optional_str(payload: dict[str, object], keys: tuple[str, ...]) -> str | None:
@@ -47,7 +61,7 @@ def _extract_optional_str(payload: dict[str, object], keys: tuple[str, ...]) -> 
     return None
 
 
-def _build_flat_sequence(payload: dict[str, object], source_path: Path) -> AnimationSequence:
+def _build_flat_sequence(payload: dict[str, object], source_path: Path) -> SequenceRecord:
     validated = validate_sequence(payload)
     if not validated["valid"]:
         raise ValueError(f"Invalid single-sequence input: {validated['reason']}")
@@ -64,7 +78,7 @@ def _build_flat_sequence(payload: dict[str, object], source_path: Path) -> Anima
     subset_name = _extract_optional_str(payload, ("subset", "dataset", "source_subset"))
 
     stem = _safe_name(source_path.stem)
-    sequence = AnimationSequence(
+    sequence = SequenceRecord(
         subset_name=_safe_name(subset_name or DEFAULT_SUBSET_NAME),
         subject_id=_safe_name(subject_id or stem),
         trial_id=_safe_name(trial_id or DEFAULT_TRIAL_ID),
@@ -78,8 +92,8 @@ def _build_flat_sequence(payload: dict[str, object], source_path: Path) -> Anima
     return sequence
 
 
-def _flatten_nested_sequences(payload: dict[str, Any], source_path: Path) -> list[AnimationSequence]:
-    sequences: list[AnimationSequence] = []
+def _flatten_nested_sequences(payload: dict[str, Any], source_path: Path) -> list[SequenceRecord]:
+    sequences: list[SequenceRecord] = []
     subset_name = _safe_name(source_path.stem)
     for subject_id, trials in payload.items():
         if not isinstance(trials, dict):
@@ -99,7 +113,7 @@ def _flatten_nested_sequences(payload: dict[str, Any], source_path: Path) -> lis
             }
             metadata.setdefault("input_contract", "nested_dataset_sequence")
             sequences.append(
-                AnimationSequence(
+                SequenceRecord(
                     subset_name=subset_name,
                     subject_id=_safe_name(subject_id),
                     trial_id=_safe_name(trial_id),

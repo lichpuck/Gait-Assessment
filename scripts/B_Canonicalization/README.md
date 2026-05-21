@@ -2,6 +2,11 @@
 
 This package canonicalizes `A_Audition` outputs with one sequence-level similarity transform.
 
+The stage is independent of the removed `care_pd_pipeline` package.  Its only SMPL
+forward use is the neutral beta=0 long-bone target calculation for scale alignment,
+and that call is routed through the local `scripts.A_Audition.smpl_forward` SMPLX
+backend.
+
 It reads:
 
 ```text
@@ -36,6 +41,9 @@ The body frame is estimated from the first frames of `joints_3d`: torso up initi
 `+Z`, subject-left initializes `+Y`, and `left x up` defines `+X`. The stage then
 estimates one per-sequence global body scale from a robust lower-limb bone subset by
 comparing observed body-frame bone lengths against neutral SMPL `beta=0` target lengths.
+Those target lengths are computed from `body_models/smpl/SMPL_NEUTRAL.pkl` through the
+shared local SMPLX wrapper used by A_Audition, including the NumPy 2.x/chumpy pickle
+compatibility patch.
 If scale estimation is unreliable, the stage keeps `s_global = 1.0` and records a
 skipped reason in JSON. Floor fitting then runs on the scaled body-frame joints. If the
 fitted plane is reliable, `R_floor` levels that plane so its normal maps to final `+Z`;
